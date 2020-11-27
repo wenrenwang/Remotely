@@ -7,12 +7,6 @@ namespace Remotely.Shared.Models
 {
     public class RemotelyUser : IdentityUser
     {
-        public RemotelyUser()
-        {
-            UserOptions = new RemotelyUserOptions();
-            Organization = new Organization();
-        }
-
         public ICollection<Alert> Alerts { get; set; }
 
         [StringLength(100)]
@@ -26,6 +20,9 @@ namespace Remotely.Shared.Models
         public string OrganizationID { get; set; }
 
         public List<UserDevicePermission> PermissionLinks { get; set; }
+
+        public string TempPassword { get; set; }
+
         public RemotelyUserOptions UserOptions { get; set; }
     }
 }
