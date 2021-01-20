@@ -2,9 +2,8 @@
 import * as UI from "./UI.js";
 import * as CommandProcessor from "./CommandProcessor.js";
 import * as DataGrid from "./DataGrid.js";
-import * as HubConnection from "./HubConnection.js";
-import { WebCommands } from "./Commands/WebCommands.js";
-import { AddConsoleOutput } from "./Console.js";
+import { BrowserHubConnection } from "./BrowserHubConnection.js";
+import { AddConsoleHTML, AddConsoleOutput } from "./Console.js";
 import { ShowModal, ShowMessage } from "../Shared/UI.js";
 
 
@@ -135,7 +134,7 @@ function clickStartRemoteControlButton() {
             ShowMessage("You must select only one device to control.");
         }
         else {
-            WebCommands.find(x => x.Name == "RemoteControl").Execute([]);
+            BrowserHubConnection.StartRemoteControl(selectedDevices[0].ID, false);
         }
     })
 }
@@ -202,10 +201,10 @@ function keyDownOnInputTextArea() {
                     }
                     UI.CommandCompletionDiv.classList.add("hidden");
                     UI.CommandInfoDiv.classList.add("hidden");
-                    AddConsoleOutput(`<span class="echo-input">${UI.ConsoleTextArea.value}</span>`);
-                    if (!HubConnection.Connected) {
+                    AddConsoleHTML("span", "echo-input", UI.ConsoleTextArea.value);
+                    if (!BrowserHubConnection.Connected) {
                         AddConsoleOutput("Not connected.  Reconnecting...");
-                        HubConnection.Connect();
+                        BrowserHubConnection.Connect();
                         return;
                     }
                     CommandProcessor.ProcessCommand();

@@ -1,36 +1,46 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Remotely.Desktop.Core.Utilities
 {
     public class ImageUtils
     {
         public static ImageCodecInfo JpegEncoder { get; } = ImageCodecInfo.GetImageEncoders().FirstOrDefault(x => x.FormatID == ImageFormat.Jpeg.Guid);
+        public static ImageCodecInfo GifEncoder { get; } = ImageCodecInfo.GetImageEncoders().FirstOrDefault(x => x.FormatID == ImageFormat.Gif.Guid);
+
         public static byte[] EncodeBitmap(Bitmap bitmap, EncoderParameters encoderParams)
         {
+            
             using var ms = new MemoryStream();
             bitmap.Save(ms, JpegEncoder, encoderParams);
             return ms.ToArray();
         }
 
-        public static List<Rectangle> GetDiffAreas(Bitmap currentFrame, Bitmap previousFrame, bool captureFullscreen)
+        public static byte[] EncodeGif(Bitmap diffImage)
         {
-            var changes = new List<Rectangle>();
+            diffImage.MakeTransparent(Color.FromArgb(0, 0, 0, 0));
+            using var ms = new MemoryStream();
+            diffImage.Save(ms, ImageFormat.Gif);
+            return ms.ToArray();
+        }
 
+        public static Rectangle GetDiffArea(Bitmap currentFrame, Bitmap previousFrame, bool captureFullscreen)
+        {
             if (currentFrame == null || previousFrame == null)
             {
-                return changes;
+                return Rectangle.Empty;
             }
 
             if (captureFullscreen)
             {
-                changes.Add(new Rectangle(new Point(0, 0), currentFrame.Size));
-                return changes;
+                return new Rectangle(new Point(0, 0), currentFrame.Size);
             }
             if (currentFrame.Height != previousFrame.Height || currentFrame.Width != previousFrame.Width)
             {
@@ -63,14 +73,8 @@ namespace Remotely.Desktop.Core.Utilities
                     byte* scan1 = (byte*)bd1.Scan0.ToPointer();
                     byte* scan2 = (byte*)bd2.Scan0.ToPointer();
 
-                    var changeOnCurrentRow = false;
-                    var changeOnPreviousRow = false;
-
                     for (var row = 0; row < height; row++)
                     {
-                        changeOnPreviousRow = changeOnCurrentRow;
-                        changeOnCurrentRow = false;
-
                         for (var column = 0; column < width; column++)
                         {
                             var index = (row * width * bytesPerPixel) + (column * bytesPerPixel);
@@ -83,7 +87,6 @@ namespace Remotely.Desktop.Core.Utilities
                                 data1[2] != data2[2] ||
                                 data1[3] != data2[3])
                             {
-                                changeOnCurrentRow = true;
 
                                 if (row < top)
                                 {
@@ -104,32 +107,28 @@ namespace Remotely.Desktop.Core.Utilities
                             }
 
                         }
-                        if (!changeOnCurrentRow &&
-                            changeOnPreviousRow &&
-                            left <= right && 
-                            top <= bottom)
-                        {
-                            AddChangeToList(changes, left, top, right, bottom, width, height);
-
-                            left = int.MaxValue;
-                            top = int.MaxValue;
-                            right = int.MinValue;
-                            bottom = int.MinValue;
-                        }
                     }
-                    if (changeOnCurrentRow &&
-                        left <= right &&
-                        top <= bottom)
+
+                    if (left <= right && top <= bottom)
                     {
-                        AddChangeToList(changes, left, top, right, bottom, width, height);
+                        // Bounding box is valid.  Padding is necessary to prevent artifacts from
+                        // moving windows.
+                        left = Math.Max(left - 5, 0);
+                        top = Math.Max(top - 5, 0);
+                        right = Math.Min(right + 5, width);
+                        bottom = Math.Min(bottom + 5, height);
+
+                        return new Rectangle(left, top, right - left, bottom - top);
+                    }
+                    else
+                    {
+                        return Rectangle.Empty;
                     }
                 }
-
-                return changes;
             }
             catch
             {
-                return changes;
+                return Rectangle.Empty;
             }
             finally
             {
@@ -138,10 +137,17 @@ namespace Remotely.Desktop.Core.Utilities
             }
         }
 
-        public static Bitmap GetImageDiff(Bitmap currentFrame, Bitmap previousFrame, bool captureFullscreen)
+        public static Bitmap GetImageDiff(Bitmap currentFrame, Bitmap previousFrame, bool captureFullscreen, out bool hadChanges)
         {
+            hadChanges = false;
+            if (currentFrame is null || previousFrame is null)
+            {
+                hadChanges = false;
+                return null;
+            }
             if (captureFullscreen)
             {
+                hadChanges = true;
                 return (Bitmap)currentFrame.Clone();
             }
 
@@ -185,6 +191,7 @@ namespace Remotely.Desktop.Core.Utilities
                             data1[2] != data2[2] ||
                             data1[3] != data2[3])
                         {
+                            hadChanges = true;
                             data3[0] = data2[0];
                             data3[1] = data2[1];
                             data3[2] = data2[2];
@@ -207,18 +214,6 @@ namespace Remotely.Desktop.Core.Utilities
                 currentFrame.UnlockBits(bd2);
                 mergedFrame.UnlockBits(bd3);
             }
-        }
-
-        private static void AddChangeToList(List<Rectangle> changes, int left, int top, int right, int bottom, int width, int height)
-        {
-            // Bounding box is valid.  Padding is necessary to prevent artifacts from
-            // moving windows.
-            left = Math.Max(left - 5, 0);
-            top = Math.Max(top - 5, 0);
-            right = Math.Min(right + 5, width);
-            bottom = Math.Min(bottom + 5, height);
-
-            changes.Add(new Rectangle(left, top, right - left, bottom - top));
         }
     }
 }

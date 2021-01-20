@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Remotely.Agent.Interfaces;
+using Remotely.Agent.Utilities;
 using Remotely.Shared.Enums;
 using Remotely.Shared.Models;
 using Remotely.Shared.Services;
@@ -25,8 +26,9 @@ namespace Remotely.Agent.Services
             Uninstaller uninstaller,
             CommandExecutor commandExecutor,
             ScriptRunner scriptRunner,
+            ChatClientService chatService,
             IAppLauncher appLauncher,
-            ChatClientService chatService)
+            IUpdater updater)
         {
             ConfigService = configService;
             Uninstaller = uninstaller;
@@ -34,6 +36,7 @@ namespace Remotely.Agent.Services
             ScriptRunner = scriptRunner;
             AppLauncher = appLauncher;
             ChatService = chatService;
+            Updater = updater;
         }
         public bool IsConnected => HubConnection?.State == HubConnectionState.Connected;
         private IAppLauncher AppLauncher { get; }
@@ -46,6 +49,8 @@ namespace Remotely.Agent.Services
         private bool IsServerVerified { get; set; }
         private ScriptRunner ScriptRunner { get; }
         private Uninstaller Uninstaller { get; }
+        private IUpdater Updater { get; }
+
         public async Task Connect()
         {
             try
@@ -99,6 +104,14 @@ namespace Remotely.Agent.Services
                 HeartbeatTimer = new System.Timers.Timer(TimeSpan.FromMinutes(5).TotalMilliseconds);
                 HeartbeatTimer.Elapsed += HeartbeatTimer_Elapsed;
                 HeartbeatTimer.Start();
+
+                if (EnvironmentHelper.IsWindows &&
+                    !RegistryHelper.CheckNetFrameworkVersion())
+                {
+                    await SendDeviceAlert("The .NET Framework version on this device is outdated, and " +
+                        "Remotely will no longer receive updates.  Update the installed .NET Framework version " +
+                        "to fix this.");
+                }
             }
             catch (Exception ex)
             {
@@ -118,7 +131,7 @@ namespace Remotely.Agent.Services
                         Logger.Write($"Websocket closed.  Reconnecting in {waitTime / 1000} seconds...");
                         await Task.Delay(waitTime);
                         await Program.Services.GetRequiredService<AgentSocket>().Connect();
-                        await Program.Services.GetRequiredService<Updater>().CheckForUpdates();
+                        await Program.Services.GetRequiredService<IUpdater>().CheckForUpdates();
                     }
                 }
                 catch (Exception ex)
@@ -129,6 +142,10 @@ namespace Remotely.Agent.Services
             }
         }
 
+        public async Task SendDeviceAlert(string alertMessage)
+        {
+            await HubConnection.SendAsync("AddDeviceAlert", alertMessage);
+        }
         public async Task SendHeartbeat()
         {
             var currentInfo = await DeviceInformation.Create(ConnectionInfo.DeviceID, ConnectionInfo.OrganizationID);
@@ -238,7 +255,7 @@ namespace Remotely.Agent.Services
                 {
                     var url = $"{ConnectionInfo.Host}/API/FileSharing/{fileID}";
                     var wr = WebRequest.CreateHttp(url);
-                    var response = await wr.GetResponseAsync();
+                    using var response = await wr.GetResponseAsync();
                     var cd = response.Headers["Content-Disposition"];
                     var filename = cd
                                     .Split(";")
@@ -265,6 +282,11 @@ namespace Remotely.Agent.Services
                 }
 
                 await ScriptRunner.RunScript(mode, fileID, commandResultID, requesterID, HubConnection);
+            });
+
+            HubConnection.On("ReinstallAgent", async () =>
+            {
+                await Updater.InstallLatestVersion();
             });
 
             HubConnection.On("UninstallAgent", () =>
@@ -300,6 +322,11 @@ namespace Remotely.Agent.Services
                 User32.SendSAS(false);
             });
 
+            HubConnection.On("TriggerHeartbeat", async () =>
+            {
+                await SendHeartbeat();
+            });
+
             HubConnection.On("ServerVerificationToken", (string verificationToken) =>
             {
                 if (verificationToken == ConnectionInfo.ServerVerificationToken)
@@ -313,5 +340,6 @@ namespace Remotely.Agent.Services
                 }
             });
         }
+
     }
 }

@@ -44,7 +44,7 @@ export class RtcSession {
                 UI.QualityButton.removeAttribute("hidden");
                 UI.VideoScreenViewer.setAttribute("hidden", "hidden");
             };
-            this.DataChannel.onmessage = async (ev) => {
+            this.DataChannel.onmessage = (ev) => {
                 var data = ev.data as ArrayBuffer;
                 ViewerApp.DtoMessageHandler.ParseBinaryMessage(data);
                

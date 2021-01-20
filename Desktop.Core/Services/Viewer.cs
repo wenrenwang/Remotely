@@ -1,4 +1,5 @@
 ﻿using Remotely.Desktop.Core.Interfaces;
+using Remotely.Desktop.Core.Models;
 using Remotely.Desktop.Core.ViewModels;
 using Remotely.Shared.Helpers;
 using Remotely.Shared.Models;
@@ -6,7 +7,9 @@ using Remotely.Shared.Models.RemoteControlDtos;
 using Remotely.Shared.Utilities;
 using Remotely.Shared.Win32;
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
@@ -17,9 +20,9 @@ namespace Remotely.Desktop.Core.Services
     public class Viewer : IDisposable
     {
         private readonly int _defaultImageQuality = 60;
-        private int _imageQuality;
+        private long _imageQuality;
         private DateTimeOffset _lastQualityAdjustment;
-        public Viewer(CasterSocket casterSocket,
+        public Viewer(ICasterSocket casterSocket,
             IScreenCapturer screenCapturer,
             IClipboardService clipboardService,
             IWebRtcSessionFactory webRtcSessionFactory,
@@ -43,7 +46,7 @@ namespace Remotely.Desktop.Core.Services
         public bool DisconnectRequested { get; set; }
         public EncoderParameters EncoderParams { get; private set; }
         public bool HasControl { get; set; } = true;
-        public int ImageQuality
+        public long ImageQuality
         {
             get
             {
@@ -103,7 +106,7 @@ namespace Remotely.Desktop.Core.Services
 
         private IAudioCapturer AudioCapturer { get; }
 
-        private CasterSocket CasterSocket { get; }
+        private ICasterSocket CasterSocket { get; }
 
         private IClipboardService ClipboardService { get; }
 
@@ -126,6 +129,12 @@ namespace Remotely.Desktop.Core.Services
                 var iceServers = await CasterSocket.GetIceServers();
 
                 RtcSession = WebRtcSessionFactory.GetNewSession(this);
+
+                if (RtcSession is null)
+                {
+                    return;
+                }
+
                 RtcSession.LocalSdpReady += async (sender, sdp) =>
                 {
                     await CasterSocket.SendRtcOfferToBrowser(sdp.Content, ViewerConnectionID, iceServers);
@@ -164,6 +173,11 @@ namespace Remotely.Desktop.Core.Services
 
         public async Task SendCursorChange(CursorInfo cursorInfo)
         {
+            if (cursorInfo is null)
+            {
+                return;
+            }
+
             var dto = new CursorChangeDto(cursorInfo.ImageBytes, cursorInfo.HotSpot.X, cursorInfo.HotSpot.Y, cursorInfo.CssOverride);
             await SendToViewer(() => RtcSession.SendDto(dto),
                 () => CasterSocket.SendDtoToViewer(dto, ViewerConnectionID));
@@ -199,8 +213,7 @@ namespace Remotely.Desktop.Core.Services
                     await SendToViewer(async () =>
                     {
                         await RtcSession.SendDto(fileDto);
-                        //await TaskHelper.DelayUntilAsync(() => RtcSession.CurrentBuffer > 0, TimeSpan.FromSeconds(1), 100);
-                        await TaskHelper.DelayUntilAsync(() => RtcSession.CurrentBuffer == 0, TimeSpan.MaxValue, 100);
+                        await TaskHelper.DelayUntilAsync(() => RtcSession.CurrentBuffer == 0, TimeSpan.FromSeconds(5), 100);
                     },
                     async () =>
                     {
@@ -236,11 +249,16 @@ namespace Remotely.Desktop.Core.Services
                 () => CasterSocket.SendDtoToViewer(dto, ViewerConnectionID));
         }
 
-        public async Task SendScreenCapture(byte[] encodedImageBytes, int left, int top, int width, int height)
+        public async Task SendScreenCapture(CaptureFrame screenFrame)
         {
             PendingSentFrames.Enqueue(DateTimeOffset.Now);
 
-            for (var i = 0; i < encodedImageBytes.Length; i += 50_000)
+            var left = screenFrame.Left;
+            var top = screenFrame.Top;
+            var width = screenFrame.Width;
+            var height = screenFrame.Height;
+
+            for (var i = 0; i < screenFrame.EncodedImageBytes.Length; i += 50_000)
             {
                 var dto = new CaptureFrameDto()
                 {
@@ -249,7 +267,7 @@ namespace Remotely.Desktop.Core.Services
                     Width = width,
                     Height = height,
                     EndOfFrame = false,
-                    ImageBytes = encodedImageBytes.Skip(i).Take(50_000).ToArray(),
+                    ImageBytes = screenFrame.EncodedImageBytes.Skip(i).Take(50_000).ToArray(),
                     ImageQuality = _imageQuality
                 };
 
@@ -305,7 +323,7 @@ namespace Remotely.Desktop.Core.Services
                 {
                     UpdateImageQuality();
 
-                    return PendingSentFrames.Count < 5 &&
+                    return PendingSentFrames.Count < 7 &&
                         (
                             !PendingSentFrames.TryPeek(out var result) || DateTimeOffset.Now - result < TimeSpan.FromSeconds(1)
                         );
