@@ -17,7 +17,7 @@ namespace Remotely.Server.Migrations.PostgreSql
             modelBuilder
                 .UseIdentityByDefaultColumns()
                 .HasAnnotation("Relational:MaxIdentifierLength", 63)
-                .HasAnnotation("ProductVersion", "5.0.1");
+                .HasAnnotation("ProductVersion", "5.0.2");
 
             modelBuilder.Entity("DeviceGroupRemotelyUser", b =>
                 {
@@ -241,6 +241,7 @@ namespace Remotely.Server.Migrations.PostgreSql
             modelBuilder.Entity("Remotely.Shared.Models.Alert", b =>
                 {
                     b.Property<string>("ID")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("CreatedOn")
@@ -272,6 +273,7 @@ namespace Remotely.Server.Migrations.PostgreSql
             modelBuilder.Entity("Remotely.Shared.Models.ApiToken", b =>
                 {
                     b.Property<string>("ID")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset?>("LastUsed")
@@ -299,9 +301,55 @@ namespace Remotely.Server.Migrations.PostgreSql
                     b.ToTable("ApiTokens");
                 });
 
+            modelBuilder.Entity("Remotely.Shared.Models.BrandingInfo", b =>
+                {
+                    b.Property<string>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text");
+
+                    b.Property<byte>("ButtonForegroundBlue")
+                        .HasColumnType("smallint");
+
+                    b.Property<byte>("ButtonForegroundGreen")
+                        .HasColumnType("smallint");
+
+                    b.Property<byte>("ButtonForegroundRed")
+                        .HasColumnType("smallint");
+
+                    b.Property<byte[]>("Icon")
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("Product")
+                        .HasMaxLength(25)
+                        .HasColumnType("character varying(25)");
+
+                    b.Property<byte>("TitleBackgroundBlue")
+                        .HasColumnType("smallint");
+
+                    b.Property<byte>("TitleBackgroundGreen")
+                        .HasColumnType("smallint");
+
+                    b.Property<byte>("TitleBackgroundRed")
+                        .HasColumnType("smallint");
+
+                    b.Property<byte>("TitleForegroundBlue")
+                        .HasColumnType("smallint");
+
+                    b.Property<byte>("TitleForegroundGreen")
+                        .HasColumnType("smallint");
+
+                    b.Property<byte>("TitleForegroundRed")
+                        .HasColumnType("smallint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("BrandingInfo");
+                });
+
             modelBuilder.Entity("Remotely.Shared.Models.CommandResult", b =>
                 {
                     b.Property<string>("ID")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("text");
 
                     b.Property<string>("CommandMode")
@@ -431,6 +479,7 @@ namespace Remotely.Server.Migrations.PostgreSql
             modelBuilder.Entity("Remotely.Shared.Models.DeviceGroup", b =>
                 {
                     b.Property<string>("ID")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("text");
 
                     b.Property<string>("Name")
@@ -450,6 +499,7 @@ namespace Remotely.Server.Migrations.PostgreSql
             modelBuilder.Entity("Remotely.Shared.Models.EventLog", b =>
                 {
                     b.Property<string>("ID")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("text");
 
                     b.Property<int>("EventType")
@@ -480,6 +530,7 @@ namespace Remotely.Server.Migrations.PostgreSql
             modelBuilder.Entity("Remotely.Shared.Models.InviteLink", b =>
                 {
                     b.Property<string>("ID")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("DateSent")
@@ -507,13 +558,25 @@ namespace Remotely.Server.Migrations.PostgreSql
             modelBuilder.Entity("Remotely.Shared.Models.Organization", b =>
                 {
                     b.Property<string>("ID")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("text");
+
+                    b.Property<string>("BrandingInfoId")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDefaultOrganization")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("OrganizationName")
                         .HasMaxLength(25)
                         .HasColumnType("character varying(25)");
 
+                    b.Property<string>("RelayCode")
+                        .HasColumnType("text");
+
                     b.HasKey("ID");
+
+                    b.HasIndex("BrandingInfoId");
 
                     b.ToTable("Organizations");
                 });
@@ -521,6 +584,7 @@ namespace Remotely.Server.Migrations.PostgreSql
             modelBuilder.Entity("Remotely.Shared.Models.SharedFile", b =>
                 {
                     b.Property<string>("ID")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("text");
 
                     b.Property<string>("ContentType")
@@ -720,6 +784,15 @@ namespace Remotely.Server.Migrations.PostgreSql
                         .HasForeignKey("OrganizationID");
 
                     b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("Remotely.Shared.Models.Organization", b =>
+                {
+                    b.HasOne("Remotely.Shared.Models.BrandingInfo", "BrandingInfo")
+                        .WithMany()
+                        .HasForeignKey("BrandingInfoId");
+
+                    b.Navigation("BrandingInfo");
                 });
 
             modelBuilder.Entity("Remotely.Shared.Models.SharedFile", b =>

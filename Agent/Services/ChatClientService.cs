@@ -110,9 +110,9 @@ namespace Remotely.Agent.Services
 
         private async Task ReadFromStream(NamedPipeClientStream clientPipe, string senderConnectionID, HubConnection hubConnection)
         {
+            using var sr = new StreamReader(clientPipe, leaveOpen: true);
             while (clientPipe.IsConnected)
             {
-                using var sr = new StreamReader(clientPipe, leaveOpen: true);
                 var messageJson = await sr.ReadLineAsync();
                 if (!string.IsNullOrWhiteSpace(messageJson))
                 {

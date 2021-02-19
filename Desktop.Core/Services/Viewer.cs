@@ -1,15 +1,12 @@
 ﻿using Remotely.Desktop.Core.Interfaces;
 using Remotely.Desktop.Core.Models;
 using Remotely.Desktop.Core.ViewModels;
-using Remotely.Shared.Helpers;
+using Remotely.Shared.Utilities;
 using Remotely.Shared.Models;
 using Remotely.Shared.Models.RemoteControlDtos;
-using Remotely.Shared.Utilities;
 using Remotely.Shared.Win32;
 using System;
-using System.Collections;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
@@ -120,6 +117,7 @@ namespace Remotely.Desktop.Core.Services
                 RtcSession,
                 Capturer
             });
+            GC.SuppressFinalize(this);
         }
 
         public async Task InitializeWebRtc()
@@ -348,13 +346,21 @@ namespace Remotely.Desktop.Core.Services
 
         private Task SendToViewer(Func<Task> webRtcSend, Func<Task> websocketSend)
         {
-            if (IsUsingWebRtc)
+            try
             {
-                return webRtcSend();
+                if (IsUsingWebRtc)
+                {
+                    return webRtcSend();
+                }
+                else
+                {
+                    return websocketSend();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                return websocketSend();
+                Logger.Write(ex);
+                return Task.CompletedTask;
             }
         }
 

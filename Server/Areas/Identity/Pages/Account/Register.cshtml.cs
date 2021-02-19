@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Remotely.Server.Services;
 using Remotely.Shared.Models;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -44,7 +45,7 @@ namespace Remotely.Server.Areas.Identity.Pages.Account
 
         [BindProperty]
         public InputModel Input { get; set; }
-
+        public int OrganizationCount { get; set; }
         public string ReturnUrl { get; set; }
 
         public IList<AuthenticationScheme> ExternalLogins { get; set; }
@@ -70,6 +71,7 @@ namespace Remotely.Server.Areas.Identity.Pages.Account
 
         public async Task OnGetAsync(string returnUrl = null)
         {
+            OrganizationCount = _dataService.GetOrganizationCount();
             ReturnUrl = returnUrl;
             ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
         }
@@ -83,6 +85,7 @@ namespace Remotely.Server.Areas.Identity.Pages.Account
             }
             returnUrl ??= Url.Content("~/");
             ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
+
             if (ModelState.IsValid)
             {
                 var user = new RemotelyUser
@@ -94,6 +97,13 @@ namespace Remotely.Server.Areas.Identity.Pages.Account
                     UserOptions = new RemotelyUserOptions(),
                     IsAdministrator = true
                 };
+
+                do
+                {
+                    user.Organization.RelayCode = new string(Guid.NewGuid().ToString().Take(4).ToArray());
+                }
+                while (await _dataService.GetOrganizationByRelayCode(user.Organization.RelayCode) != null);
+
                 var result = await _userManager.CreateAsync(user, Input.Password);
 
                 if (result.Succeeded)

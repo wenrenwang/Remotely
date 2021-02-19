@@ -1,9 +1,8 @@
 ﻿using MessagePack;
 using Microsoft.MixedReality.WebRTC;
-using Remotely.Shared.Helpers;
+using Remotely.Shared.Utilities;
 using Remotely.Shared.Models;
 using Remotely.Shared.Models.RemoteControlDtos;
-using Remotely.Shared.Utilities;
 using System;
 using System.Drawing;
 using System.Linq;
@@ -67,6 +66,7 @@ namespace Remotely.Desktop.Core.Services
                 VideoSource,
                 PeerSession
             });
+            GC.SuppressFinalize(this);
         }
 
         public async Task Init(IceServerModel[] iceServers)

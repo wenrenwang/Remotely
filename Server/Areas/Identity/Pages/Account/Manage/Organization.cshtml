@@ -3,28 +3,37 @@
 @inject IDataService  DataService
 @{
     ViewData["Title"] = "Manage Organization";
-    var currentUser = DataService.GetUserByName(User.Identity.Name);
-    var organizationID = currentUser.OrganizationID;
-    var isAdmin = currentUser.IsAdministrator;
 
 }
 <h4>@ViewData["Title"]</h4>
 
-@if (isAdmin)
+@if (Model.CurrentUser.IsAdministrator)
 {
-    <partial name="_StatusMessage" for="StatusMessage" />
 
-    <div asp-validation-summary="All" class="text-danger"></div>
+    <div class="row">
+        <div class="col-sm-8">
+            <partial name="_StatusMessage" for="StatusMessage" />
+
+            <div asp-validation-summary="All" class="text-danger"></div>
+        </div>
+    </div>
 
     <div class="row">
         <div class="col-sm-8">
             @* Organization ID *@
             <div class="form-group mw">
                 <label class="mb-1">Organization ID</label>
-                <input readonly class="form-control" value="@organizationID" />
+                <input readonly class="form-control" value="@Model.Organization.ID" />
+            </div>
+            <div class="form-group mw">
+                <label class="mb-1">Relay Code</label>
+                <span id="relayCodeHelp" class="fas fa-question-circle pointer"></span>
+                <br />
+                <input readonly class="form-control" value="@Model.Organization.RelayCode" />
             </div>
         </div>
     </div>
+
 
     <div class="row">
         <div class="col-sm-8">
@@ -33,12 +42,21 @@
                 <label class="mb-1">Organization Name</label>
 
                 <div class="input-group">
-                    <input id="organizationNameInput" asp-for="OrganizationName" placeholder="Enter a name for your organization" class="form-control" />
+                    <input id="organizationNameInput" asp-for="Organization.OrganizationName" placeholder="Enter a name for your organization" class="form-control" autocomplete="off" />
                     <div class="input-group-append">
                         <div class="fa fa-edit input-group-text"></div>
                     </div>
                 </div>
             </div>
+            @if (Model.CurrentUser.IsServerAdmin)
+            {
+                <div class="form-group">
+                    <label class="mb-1">Default Organization For Server</label>
+                    <span id="defaultOrgHelp" class="fas fa-question-circle pointer"></span>
+                    <br />
+                    <input id="defaultOrgCheckbox" type="checkbox" asp-for="IsDefaultOrganization" />
+                </div>                
+            }
         </div>
     </div>
 
@@ -47,7 +65,7 @@
 
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             @* Device Groups *@
-            <form asp-page-handler="CreateDeviceGroup">
+            <form asp-page-handler="CreateDeviceGroup" autocomplete="off">
                 <div class="form-group">
                     <label class="mb-1">Device Groups</label>
                     <span id="deviceGroupHelpButton" class="fas fa-question-circle pointer"></span>
@@ -89,7 +107,7 @@
                         {
                             <tr user="@Model.Users[i].ID">
                                 <td class="middle-aligned"><label class="control-label">@Model.Users[i].UserName</label></td>
-                                @if (currentUser.Id == Model.Users[i].ID)
+                                @if (Model.CurrentUser.Id == Model.Users[i].ID)
                                 {
                                     <td>@Html.CheckBoxFor(x => x.Users[i].IsAdmin, new { user = Model.Users[i].ID, @class = "user-is-admin-checkbox", disabled = "disabled" })</td>
                                     <td></td>
@@ -150,7 +168,7 @@
     <div class="row">
         <div class="col-sm-8">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <form method="post" asp-page-handler="AddUser">
+            <form method="post" asp-page-handler="AddUser" autocomplete="off">
                 <div class="form-group">
                     <label class="control-label">Add User</label>
                     <div class="input-group">
@@ -208,7 +226,7 @@
                         </div>
 
                         <div class="input-group">
-                            <input placeholder="Add user to device group" class="form-control add-user-to-devicegroup-input" group="@Model.DeviceGroups[i].ID" maxlength="200" />
+                            <input placeholder="Add user to device group" class="form-control add-user-to-devicegroup-input" group="@Model.DeviceGroups[i].ID" maxlength="200"  autocomplete="off" />
                             <button type="button" class="btn btn-secondary add-user-to-devicegroup-button" group="@Model.DeviceGroups[i].ID">
                                 Add
                             </button>
@@ -222,6 +240,13 @@
         </div>
 
     }
+
+    <style>
+        input[type='checkbox'] {
+            width: 25px;
+            height: 25px;
+        }
+    </style>
 
     <script>
         require.config({

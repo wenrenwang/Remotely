@@ -1,23 +1,36 @@
-﻿import { ShowModal } from "../Shared/UI.js";
+﻿import { ShowMessage, ShowModal } from "../Shared/UI.js";
 
 export const OrganizationManagement = {
     Init() {
 
 
-        document.getElementById("usersHelpButton").addEventListener("click", (ev) => {
+        document.getElementById("usersHelpButton").addEventListener("click", () => {
             ShowModal("Users", `All users for the organization are managed here.<br><br>
-        Administrators will have access to this management screen as well as all computers.`);
+                Administrators will have access to this management screen as well as all computers.`);
         });
-        document.getElementById("invitesHelpButton").addEventListener("click", (ev) => {
+        document.getElementById("invitesHelpButton").addEventListener("click", () => {
             ShowModal("Invitations", `All pending invitations will be shown here and can be revoked by deleting them.<br><br>
-        If a user does not exist, sending an invite will create their account and add them to the current organization.
-        A password reset URL can be generated from the user table.
-        <br><br>
-        The Admin checkbox determines if the new user will have administrator privileges in this organization.`);
+                If a user does not exist, sending an invite will create their account and add them to the current organization.
+                A password reset URL can be generated from the user table.
+                <br><br>
+                The Admin checkbox determines if the new user will have administrator privileges in this organization.`);
         });
 
-        document.getElementById("deviceGroupHelpButton").addEventListener("click", (ev) => {
+        document.getElementById("deviceGroupHelpButton").addEventListener("click", () => {
             ShowModal("Device Groups", `Device groups can be used to organize and filter computers on the grid.`);
+        });
+
+
+        document.getElementById("defaultOrgHelp").addEventListener("click", () => {
+            ShowModal("Default Organization", `This option is only available for server administrators.  When
+                selected, it sets this organization as the default for the server.  If the organization can't
+                be determined in the quick support apps, they will use the default organization's branding.`);
+        });
+
+        document.getElementById("relayCodeHelp").addEventListener("click", () => {
+            ShowModal("Relay Code", `This relay code will be appended to EXE filenames.  If the clients
+                were built from source and have the server URL embedded, they will use this code to look
+                up the branding to use for your organization.`);
         });
 
 
@@ -175,19 +188,37 @@ export const OrganizationManagement = {
             xhr.send(JSON.stringify((ev.currentTarget as HTMLInputElement).value));
         });
 
+        document.getElementById("defaultOrgCheckbox").addEventListener("change", (ev) => {
+            var xhr = new XMLHttpRequest();
+            xhr.onload = () => {
+                if (xhr.status == 200) {
+                    ShowMessage("Default organization set.");
+                }
+                else if (xhr.status == 400) {
+                    ShowModal("Invalid Request", xhr.responseText);
+                }
+                else {
+                    showError(xhr);
+                }
+            }
+            xhr.onerror = () => {
+                showError(xhr);
+            }
+            xhr.open("put", location.origin + "/api/OrganizationManagement/SetDefault");
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.send(JSON.stringify((ev.currentTarget as HTMLInputElement).checked));
+        });
+
 
         document.querySelectorAll(".user-is-admin-checkbox").forEach((checkbox: HTMLInputElement) => {
             checkbox.addEventListener("change", (ev) => {
                 var userID = checkbox.getAttribute("user");
                 var xhr = new XMLHttpRequest();
                 xhr.onload = () => {
-                    if (xhr.status == 200) {
-
-                    }
-                    else if (xhr.status == 400) {
+                    if (xhr.status == 400) {
                         ShowModal("Invalid Request", xhr.responseText);
                     }
-                    else {
+                    else if (xhr.status != 200) {
                         showError(xhr);
                     }
                 }
